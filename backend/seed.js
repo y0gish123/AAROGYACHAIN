@@ -1,7 +1,9 @@
 const mongoose = require('mongoose');
 const dotenv = require('dotenv');
 const User = require('./models/User');
+const Doctor = require('./models/Doctor');
 const Report = require('./models/Report');
+const bcrypt = require('bcryptjs');
 
 dotenv.config();
 
@@ -12,6 +14,17 @@ const seedData = async () => {
         // Clear existing data
         await User.deleteMany({});
         await Report.deleteMany({});
+        await Doctor.deleteMany({});
+
+        // Create Demo Doctor
+        const salt = await bcrypt.genSalt(10);
+        const hashedDoctorPassword = await bcrypt.hash('doctor123', salt);
+        await Doctor.create({
+            fullName: 'Dr. Demo',
+            uid: 'D-948573',
+            email: 'dr.demo@example.com',
+            password: hashedDoctorPassword
+        });
 
         // Create Demo Patient
         const demoPatient = await User.create({

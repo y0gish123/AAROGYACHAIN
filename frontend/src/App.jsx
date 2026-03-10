@@ -4,6 +4,8 @@ import LandingPage from './pages/LandingPage/LandingPage';
 import LoginPage from './pages/LoginPage/LoginPage';
 import PatientDashboard from './pages/PatientDashboard/PatientDashboard';
 import DoctorDashboard from './pages/DoctorDashboard/DoctorDashboard';
+import DoctorLogin from './pages/DoctorLogin/DoctorLogin';
+import DoctorRegister from './pages/DoctorRegister/DoctorRegister';
 import './index.css';
 
 function App() {
@@ -15,7 +17,8 @@ function App() {
         <Route path="/patient-dashboard" element={<PatientDashboard />} />
         <Route path="/doctor-dashboard" element={<DoctorDashboard />} />
         <Route path="/patient-login" element={<LoginPage />} />
-        <Route path="/doctor-login" element={<LoginPage />} />
+        <Route path="/doctor-login" element={<DoctorLogin />} />
+        <Route path="/doctor-register" element={<DoctorRegister />} />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </Router>

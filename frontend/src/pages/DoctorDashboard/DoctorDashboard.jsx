@@ -1,24 +1,64 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Upload, Search, FileText, User, Calendar, CheckCircle } from 'lucide-react';
+import {
+    Upload,
+    Search,
+    FileText,
+    User,
+    Calendar,
+    CheckCircle,
+    QrCode,
+    Activity,
+    Heart,
+    AlertCircle,
+    Eye,
+    ChevronRight,
+    ArrowLeft,
+    Send,
+    MessageCircle,
+    LayoutDashboard,
+    History,
+    Zap,
+    ExternalLink,
+    Shield
+} from 'lucide-react';
 import axios from 'axios';
 import Navbar from '../../components/Navbar/Navbar';
+import StatCard from '../../components/StatCard';
+import InsightCard from '../../components/InsightCard';
 import confetti from 'canvas-confetti';
 
 const DoctorDashboard = () => {
+    const [activeTab, setActiveTab] = useState('upload'); // 'upload' or 'search'
+
+    // Upload State
     const [abha, setAbha] = useState('');
     const [patientName, setPatientName] = useState('');
     const [reportType, setReportType] = useState('General Checkup');
+    const [reportDate, setReportDate] = useState(new Date().toISOString().split('T')[0]);
     const [file, setFile] = useState(null);
     const [isUploading, setIsUploading] = useState(false);
     const [uploadSuccess, setUploadSuccess] = useState(false);
 
+    // Search/View State
+    const [searchQuery, setSearchQuery] = useState('');
+    const [searchedPatient, setSearchedPatient] = useState(null);
+    const [patientReports, setPatientReports] = useState([]);
+    const [isSearching, setIsSearching] = useState(false);
+    const [error, setError] = useState('');
+    const [isScanning, setIsScanning] = useState(false);
+
+    // AI Chat State
+    const [chatMessages, setChatMessages] = useState([
+        { text: "Welcome back, Doctor. I've prepared the analysis environment. Search for a patient to begin diagnostic synthesis.", isAi: true }
+    ]);
+    const [isAnalyzing, setIsAnalyzing] = useState(false);
+    const [inputMessage, setInputMessage] = useState('');
+    const [insights, setInsights] = useState([]);
+
     const handleUpload = async (e) => {
         e.preventDefault();
-        if (!file) {
-            alert("Please select a file first");
-            return;
-        }
+        if (!file) return alert("Please select a diagnostic file.");
 
         setIsUploading(true);
         const formData = new FormData();
@@ -26,160 +66,473 @@ const DoctorDashboard = () => {
         formData.append('patientName', patientName);
         formData.append('reportType', reportType);
         formData.append('doctorName', 'Dr. Demo');
+        formData.append('date', reportDate);
         formData.append('report', file);
 
         try {
-            // Check if backend is reachable before real upload
-            await axios.get('http://localhost:5000/api/reports/health').catch(e => {
-                if (e.code === 'ERR_NETWORK') throw new Error('OFFLINE');
-            });
-
-            const response = await axios.post('http://localhost:5000/api/reports/upload', formData, {
+            await axios.post('http://localhost:5000/api/reports/upload', formData, {
                 headers: { 'Content-Type': 'multipart/form-data' }
             });
-
             setIsUploading(false);
             handleSuccess();
+            setAbha('');
+            setPatientName('');
+            setFile(null);
         } catch (error) {
-            console.error("Upload process encountered an issue", error);
-
-            if (error.message === 'OFFLINE') {
-                // MOCK SUCCESS for demo when backend is offline
-                setTimeout(() => {
-                    setIsUploading(false);
-                    handleSuccess("Demo Upload Success (Offline)");
-                }, 1500);
-            } else {
-                alert("Upload failed. Make sure the backend is running.");
-                setIsUploading(false);
-            }
+            setIsUploading(false);
+            alert(error.response?.data?.error || "Upload failed.");
         }
     };
 
-    const handleSuccess = (msg) => {
+    const handleSearchPatient = async (e, forcedAbha = null) => {
+        if (e) e.preventDefault();
+        const targetAbha = (forcedAbha || searchQuery).toString().trim().replace(/-/g, '');
+        if (!targetAbha) return;
+
+        setIsSearching(true);
+        setError('');
+        setSearchedPatient(null);
+        setPatientReports([]);
+        setChatMessages([{ text: `Initializing secure data retrieval for ABHA: ${targetAbha}...`, isAi: true }]);
+
+        try {
+            const [patientRes, reportsRes] = await Promise.all([
+                axios.get(`http://localhost:5000/api/auth/patient/${targetAbha}`),
+                axios.get(`http://localhost:5000/api/reports/${targetAbha}`)
+            ]);
+
+            setSearchedPatient(patientRes.data.patient);
+            setPatientReports(reportsRes.data);
+            setChatMessages(prev => [
+                ...prev,
+                { text: `Profile for ${patientRes.data.patient.name} loaded successfully. Found ${reportsRes.data.length} records on chain. Would you like an automated clinical summary?`, isAi: true }
+            ]);
+        } catch (err) {
+            setError("Patient record not found in the decentralized registry.");
+            setChatMessages(prev => [...prev, { text: "Error: Unable to locate records for this identity vector.", isAi: true }]);
+        } finally {
+            setIsSearching(false);
+        }
+    };
+
+    const handleScanQR = () => {
+        setIsScanning(true);
+        setTimeout(() => {
+            setIsScanning(false);
+            const demoAbha = '1234567890';
+            setSearchQuery(demoAbha);
+            handleSearchPatient(null, demoAbha);
+        }, 2200);
+    };
+
+    const handleAnalyze = async () => {
+        if (!searchedPatient) return;
+        setIsAnalyzing(true);
+        setChatMessages(prev => [...prev, { text: "Synthesizing cross-report insights...", isAi: true }]);
+        try {
+            const response = await axios.post('http://localhost:5000/api/reports/analyze', { abhaNumber: searchedPatient.abhaNumber });
+            setChatMessages(prev => [
+                ...prev.filter(m => !m.text.includes("Synthesizing")),
+                { text: response.data.message, isAi: true }
+            ]);
+            setInsights(response.data.insights || []);
+        } catch (error) {
+            const mockMsg = `AI Analysis for ${searchedPatient.name}: Recent vitals indicate stable homeostasis. Heart rate (72bpm) and BP (120/80) are optimal. Suggest reviewing the last Blood Test for micronutrient trends.`;
+            setChatMessages(prev => [
+                ...prev.filter(m => !m.text.includes("Synthesizing")),
+                { text: mockMsg, isAi: true }
+            ]);
+        } finally {
+            setIsAnalyzing(false);
+        }
+    };
+
+    const handleSendMessage = (e) => {
+        e.preventDefault();
+        if (!inputMessage.trim()) return;
+
+        const userMsg = inputMessage;
+        setChatMessages(prev => [...prev, { text: userMsg, isAi: false }]);
+        setInputMessage('');
+
+        setTimeout(() => {
+            let aiResponse = "As your AI clinical co-pilot, I've analyzed the patient's records. Their overall health trajectory remains positive.";
+            if (userMsg.toLowerCase().includes('heart')) aiResponse = "Current heart rate: 72 bpm. Historical variance: ±4 bpm. Status: Normal.";
+            if (userMsg.toLowerCase().includes('bp')) aiResponse = "Latest BP: 120/80 mmHg. No hypertensive indicators found in recent diagnostic uploads.";
+            setChatMessages(prev => [...prev, { text: aiResponse, isAi: true }]);
+        }, 600);
+    };
+
+    const handleSuccess = () => {
         setUploadSuccess(true);
-        confetti({
-            particleCount: 150,
-            spread: 70,
-            origin: { y: 0.6 },
-            colors: ['#2563EB', '#2E8B57', '#F8FAFC']
-        });
+        confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 }, colors: ['#2563EB', '#059669', '#F8FAFC'] });
         setTimeout(() => setUploadSuccess(false), 5000);
     };
 
     return (
-        <div className="min-h-screen bg-background pt-24 px-4 pb-12">
+        <div className="min-h-screen bg-background pt-24 px-4 pb-12 overflow-x-hidden">
             <Navbar />
-            <div className="max-w-4xl mx-auto">
-                <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="glass-card p-8 mb-8"
-                >
-                    <div className="flex items-center gap-4 mb-8">
-                        <div className="p-3 bg-primary/10 rounded-xl">
-                            <Upload className="text-primary w-8 h-8" />
-                        </div>
-                        <div>
-                            <h1 className="text-2xl font-bold">Doctor Dashboard</h1>
-                            <p className="text-gray-600">Upload new medical records to ABHA Chain</p>
-                        </div>
+
+            <div className="max-w-7xl mx-auto">
+                {/* Header Stats */}
+                <header className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10">
+                    <div>
+                        <motion.div
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="flex items-center gap-3 mb-2"
+                        >
+                            <span className="bg-primary/10 text-primary p-2 rounded-lg"><LayoutDashboard size={20} /></span>
+                            <span className="text-sm font-bold uppercase tracking-widest text-slate-400">Diagnostic Hub</span>
+                        </motion.div>
+                        <h1 className="text-4xl font-black text-slate-800 font-display">Medical Console</h1>
                     </div>
 
-                    <form onSubmit={handleUpload} className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="space-y-2">
-                            <label className="text-sm font-semibold flex items-center gap-2">
-                                <User size={16} /> Patient ABHA Number
-                            </label>
-                            <input
-                                type="text"
-                                value={abha}
-                                onChange={(e) => setAbha(e.target.value)}
-                                placeholder="1234-5678-9012"
-                                className="w-full p-3 rounded-xl border border-gray-200 focus:outline-none focus:border-primary transition-all"
-                                required
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <label className="text-sm font-semibold flex items-center gap-2">
-                                <User size={16} /> Patient Name
-                            </label>
-                            <input
-                                type="text"
-                                value={patientName}
-                                onChange={(e) => setPatientName(e.target.value)}
-                                placeholder="Full Name"
-                                className="w-full p-3 rounded-xl border border-gray-200 focus:outline-none focus:border-primary transition-all"
-                                required
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <label className="text-sm font-semibold flex items-center gap-2">
-                                <FileText size={16} /> Report Type
-                            </label>
-                            <select
-                                value={reportType}
-                                onChange={(e) => setReportType(e.target.value)}
-                                className="w-full p-3 rounded-xl border border-gray-200 focus:outline-none focus:border-primary transition-all"
-                            >
-                                <option>General Checkup</option>
-                                <option>Blood Test</option>
-                                <option>X-Ray / MRI</option>
-                                <option>Prescription</option>
-                                <option>Discharge Summary</option>
-                            </select>
-                        </div>
-                        <div className="space-y-2">
-                            <label className="text-sm font-semibold flex items-center gap-2">
-                                <Calendar size={16} /> Date
-                            </label>
-                            <input
-                                type="date"
-                                className="w-full p-3 rounded-xl border border-gray-200 focus:outline-none focus:border-primary transition-all"
-                                defaultValue={new Date().toISOString().split('T')[0]}
-                            />
-                        </div>
-                        <div className="md:col-span-2">
-                            <div className="border-2 border-dashed border-primary/30 rounded-2xl p-8 text-center bg-primary/5 hover:bg-primary/10 transition-colors cursor-pointer group">
-                                <input
-                                    type="file"
-                                    onChange={(e) => setFile(e.target.files[0])}
-                                    className="hidden"
-                                    id="pdf-upload"
-                                    accept=".pdf"
-                                />
-                                <label htmlFor="pdf-upload" className="cursor-pointer">
-                                    <Upload className="w-12 h-12 text-primary mx-auto mb-4 group-hover:scale-110 transition-transform" />
-                                    <p className="font-semibold text-primary">
-                                        {file ? file.name : "Click to select or drag PDF file"}
-                                    </p>
-                                    <p className="text-sm text-gray-500 mt-2">Maximum file size: 10MB</p>
-                                </label>
-                            </div>
-                        </div>
+                    <div className="flex gap-2 bg-white/50 p-1.5 rounded-2xl border border-white/40 shadow-sm backdrop-blur-md">
+                        <button
+                            onClick={() => setActiveTab('upload')}
+                            className={`px-6 py-3 rounded-xl font-bold flex items-center gap-2 transition-all ${activeTab === 'upload' ? 'bg-primary text-white shadow-lg' : 'text-slate-400 hover:bg-white'}`}
+                        >
+                            <Upload size={18} /> Upload
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('search')}
+                            className={`px-6 py-3 rounded-xl font-bold flex items-center gap-2 transition-all ${activeTab === 'search' ? 'bg-secondary text-white shadow-lg' : 'text-slate-400 hover:bg-white'}`}
+                        >
+                            <Search size={18} /> Search
+                        </button>
+                    </div>
+                </header>
 
-                        <div className="md:col-span-2">
-                            <button
-                                type="submit"
-                                disabled={isUploading}
-                                className="w-full btn-primary py-4 text-lg flex items-center justify-center gap-2"
-                            >
-                                {isUploading ? (
+                <AnimatePresence mode="wait">
+                    {activeTab === 'upload' ? (
+                        <motion.div
+                            key="upload"
+                            initial={{ opacity: 0, scale: 0.98 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.98 }}
+                            className="grid grid-cols-1 lg:grid-cols-12 gap-8"
+                        >
+                            {/* Form Column */}
+                            <div className="lg:col-span-8 glass-card p-10">
+                                <form onSubmit={handleUpload} className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                    <div className="space-y-3">
+                                        <label className="text-xs font-black uppercase tracking-widest text-slate-400">Patient ABHA Number</label>
+                                        <div className="relative group">
+                                            <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-primary transition-colors" size={20} />
+                                            <input
+                                                type="text"
+                                                value={abha}
+                                                onChange={(e) => setAbha(e.target.value.replace(/\D/g, '').slice(0, 12))}
+                                                placeholder="12 digit ABHA"
+                                                className="w-full pl-12 pr-4 py-4 rounded-2xl bg-slate-50 border-2 border-transparent focus:bg-white focus:border-primary/20 outline-none transition-all font-medium"
+                                                required
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="space-y-3">
+                                        <label className="text-xs font-black uppercase tracking-widest text-slate-400">Patient Full Name</label>
+                                        <div className="relative group">
+                                            <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-primary transition-colors" size={20} />
+                                            <input
+                                                type="text"
+                                                value={patientName}
+                                                onChange={(e) => setPatientName(e.target.value)}
+                                                placeholder="Legal clinical name"
+                                                className="w-full pl-12 pr-4 py-4 rounded-2xl bg-slate-50 border-2 border-transparent focus:bg-white focus:border-primary/20 outline-none transition-all font-medium"
+                                                required
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="space-y-3">
+                                        <label className="text-xs font-black uppercase tracking-widest text-slate-400">Diagnostic Category</label>
+                                        <select
+                                            value={reportType}
+                                            onChange={(e) => setReportType(e.target.value)}
+                                            className="w-full p-4 rounded-2xl bg-slate-50 border-2 border-transparent focus:bg-white focus:border-primary/20 outline-none transition-all font-medium appearance-none"
+                                        >
+                                            <option>General Checkup</option>
+                                            <option>Blood Test</option>
+                                            <option>X-Ray / MRI</option>
+                                            <option>Prescription</option>
+                                            <option>Discharge Summary</option>
+                                        </select>
+                                    </div>
+                                    <div className="space-y-3">
+                                        <label className="text-xs font-black uppercase tracking-widest text-slate-400">Record Date</label>
+                                        <input
+                                            type="date"
+                                            value={reportDate}
+                                            onChange={(e) => setReportDate(e.target.value)}
+                                            className="w-full p-4 rounded-2xl bg-slate-50 border-2 border-transparent focus:bg-white focus:border-primary/20 outline-none transition-all font-medium"
+                                            required
+                                        />
+                                    </div>
+                                    <div className="md:col-span-2">
+                                        <div className="relative group overflow-hidden bg-slate-50 border-2 border-dashed border-slate-200 rounded-[2.5rem] p-12 text-center hover:border-primary/50 transition-all cursor-pointer">
+                                            <input type="file" onChange={(e) => setFile(e.target.files[0])} className="hidden" id="file-drop" accept=".pdf" />
+                                            <label htmlFor="file-drop" className="cursor-pointer block relative z-10">
+                                                <div className="w-20 h-20 bg-primary/5 rounded-3xl flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform">
+                                                    <Upload className="text-primary" size={32} />
+                                                </div>
+                                                <p className="text-xl font-bold text-slate-700">{file ? file.name : "Secure PDF Drop Zone"}</p>
+                                                <p className="text-sm text-slate-400 mt-2">Maximum file size: 10MB • IPFS Encrypted</p>
+                                            </label>
+                                            <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                        </div>
+                                    </div>
+                                    <div className="md:col-span-2">
+                                        <button type="submit" disabled={isUploading} className="btn-primary w-full h-16 text-xl">
+                                            <div className="flex items-center justify-center gap-3">
+                                                {isUploading ? <Activity className="animate-spin" /> : <Zap size={22} />}
+                                                <span>{isUploading ? "Uploading..." : "Upload"}</span>
+                                            </div>
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+
+                            {/* Info Column */}
+                            <div className="lg:col-span-4 space-y-8">
+                                <div className="glass-card p-8 bg-slate-900 text-white">
+                                    <Shield className="mb-4 text-primary" size={40} />
+                                    <h3 className="text-2xl font-black mb-4 uppercase tracking-tight">Secured by IPFS</h3>
+                                    <p className="text-slate-400 leading-relaxed mb-6">
+                                        Diagnostics are encrypted and stored across a decentralized network. Only authorized ABHA nodes can decrypt this information.
+                                    </p>
+                                    <div className="space-y-3">
+                                        <div className="flex items-center gap-3 text-sm font-bold bg-white/10 p-3 rounded-xl border border-white/10">
+                                            <CheckCircle size={16} className="text-emerald-400" /> End-to-end Encryption
+                                        </div>
+                                        <div className="flex items-center gap-3 text-sm font-bold bg-white/10 p-3 rounded-xl border border-white/10">
+                                            <CheckCircle size={16} className="text-emerald-400" /> Immutable Audit Log
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="glass-card p-8 bg-white">
+                                    <h4 className="text-sm font-black uppercase tracking-widest text-slate-400 mb-6">Live Health Network</h4>
+                                    <div className="space-y-6">
+                                        {[1, 2, 3].map(i => (
+                                            <div key={i} className="flex gap-4 items-center">
+                                                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                                                <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
+                                                    <motion.div
+                                                        initial={{ width: 0 }}
+                                                        animate={{ width: `${40 + i * 20}%` }}
+                                                        className="h-full bg-slate-200"
+                                                    />
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        </motion.div>
+                    ) : (
+                        <motion.div
+                            key="search"
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: 20 }}
+                            className="space-y-10"
+                        >
+                            {/* Modern Search Bar */}
+                            <div className="glass-card p-10 relative overflow-hidden">
+                                <form onSubmit={handleSearchPatient} className="flex flex-col md:flex-row gap-4 relative z-10">
+                                    <div className="flex-1 relative group">
+                                        <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-primary transition-colors" size={24} />
+                                        <input
+                                            type="text"
+                                            value={searchQuery}
+                                            onChange={(e) => setSearchQuery(e.target.value)}
+                                            placeholder="Verify via ABHA Number (e.g. 123456789012)"
+                                            className="w-full pl-16 pr-6 py-6 rounded-3xl bg-slate-50 border-2 border-transparent focus:bg-white focus:border-primary/20 outline-none transition-all text-xl font-medium shadow-inner"
+                                        />
+                                    </div>
+                                    <div className="flex gap-4">
+                                        <button type="submit" disabled={isSearching} className="btn-secondary px-10 rounded-3xl shadow-emerald-500/20">
+                                            <div className="flex items-center gap-2">
+                                                {isSearching ? <Activity className="animate-spin" /> : <ChevronRight size={20} />}
+                                                <span>Retrieve Profile</span>
+                                            </div>
+                                        </button>
+                                        <button type="button" onClick={handleScanQR} disabled={isScanning} className="bg-slate-900 text-white p-6 rounded-3xl hover:bg-slate-800 transition-all shadow-xl active:scale-95 group flex items-center justify-center">
+                                            <QrCode size={24} className="group-hover:rotate-12 transition-transform" />
+                                        </button>
+                                    </div>
+                                </form>
+                                {error && <div className="mt-6 flex items-center gap-3 text-red-500 font-bold bg-red-50 p-4 rounded-2xl border border-red-100 animate-shake"><AlertCircle size={20} /> {error}</div>}
+
+                                {isScanning && (
                                     <motion.div
-                                        animate={{ rotate: 360 }}
-                                        transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}
-                                        className="w-6 h-6 border-3 border-white/30 border-t-white rounded-full"
-                                    />
-                                ) : (
-                                    <>
-                                        <Upload size={20} />
-                                        Upload securely to IPFS
-                                    </>
+                                        initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                                        className="mt-10 p-20 glass-card-sm border-dashed border-primary/30 flex flex-col items-center relative group"
+                                    >
+                                        <div className="absolute inset-x-0 h-0.5 bg-primary/40 shadow-[0_0_15px_rgba(99,102,241,1)] animate-laser pointer-events-none" />
+                                        <div className="w-24 h-24 bg-primary/5 rounded-[2rem] flex items-center justify-center mb-6 relative">
+                                            <QrCode size={48} className="text-primary opacity-40" />
+                                            <div className="absolute inset-0 border-2 border-primary rounded-[2rem] animate-ping opacity-20" />
+                                        </div>
+                                        <h4 className="text-2xl font-black text-slate-700 font-display">Optical Recognition Active</h4>
+                                        <p className="text-slate-400 mt-2 font-medium">Detecting unique ABHA vector...</p>
+                                    </motion.div>
                                 )}
-                            </button>
-                        </div>
-                    </form>
-                </motion.div>
+                            </div>
+
+                            {/* Patient Data Console */}
+                            {searchedPatient && (
+                                <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+                                    {/* History/Timeline Column */}
+                                    <div className="lg:col-span-8 space-y-10">
+                                        <div className="glass-card p-10">
+                                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
+                                                <div className="flex items-center gap-5">
+                                                    <div className="relative">
+                                                        <div className="w-20 h-20 bg-emerald-500 rounded-[2rem] flex items-center justify-center text-white shadow-xl shadow-emerald-500/20 order-1">
+                                                            <User size={36} />
+                                                        </div>
+                                                        <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-white rounded-full flex items-center justify-center border-2 border-emerald-50">
+                                                            <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                                                        </div>
+                                                    </div>
+                                                    <div>
+                                                        <h3 className="text-3xl font-black text-slate-800 leading-tight">{searchedPatient.name}</h3>
+                                                        <p className="text-slate-400 font-bold flex items-center gap-2">
+                                                            <Shield size={14} /> ABHA: {searchedPatient.abhaNumber}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <div className="vitals-grid">
+                                                    <StatCard icon={Heart} label="Pulse Rate" value="72" unit="bpm" color="bg-red-500" />
+                                                    <StatCard icon={Activity} label="BP Vector" value="120/80" unit="mmhg" color="bg-primary" />
+                                                </div>
+                                            </div>
+
+                                            <div className="relative">
+                                                <h3 className="text-xl font-black text-slate-800 mb-8 flex items-center gap-3">
+                                                    <History className="text-primary" /> Clinical Timeline
+                                                </h3>
+
+                                                <div className="relative space-y-8 pl-8">
+                                                    {/* Vertical Line */}
+                                                    <div className="absolute left-0 top-2 bottom-2 w-0.5 bg-slate-100" />
+
+                                                    {patientReports.length === 0 ? (
+                                                        <div className="py-20 text-center glass-card-sm border-slate-100">
+                                                            <FileText className="mx-auto text-slate-200 mb-4" size={48} />
+                                                            <p className="text-slate-400 font-bold">Zero diagnostic vectors found.</p>
+                                                        </div>
+                                                    ) : (
+                                                        patientReports.map((report) => (
+                                                            <motion.div
+                                                                key={report._id}
+                                                                whileHover={{ x: 10 }}
+                                                                className="relative glass-card-sm p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 group"
+                                                            >
+                                                                <div className="absolute -left-[37px] top-7 w-4 h-4 rounded-full bg-white border-4 border-slate-200 group-hover:border-primary transition-colors" />
+                                                                <div className="flex items-center gap-5">
+                                                                    <div className="w-14 h-14 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-400 group-hover:bg-primary/10 group-hover:text-primary transition-all">
+                                                                        <FileText size={24} />
+                                                                    </div>
+                                                                    <div>
+                                                                        <p className="font-black text-slate-800 text-lg group-hover:text-primary transition-colors">{report.reportType}</p>
+                                                                        <div className="flex items-center gap-3 mt-1">
+                                                                            <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">{new Date(report.date).toLocaleDateString()}</span>
+                                                                            <span className="w-1 h-1 rounded-full bg-slate-300" />
+                                                                            <span className="text-xs font-bold text-slate-400">{report.doctorName}</span>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                                <a
+                                                                    href={report.ipfsUrl}
+                                                                    target="_blank" rel="noreferrer"
+                                                                    className="flex items-center gap-2 px-5 py-3 rounded-xl bg-slate-50 text-slate-400 font-bold text-sm hover:bg-slate-900 hover:text-white transition-all group/btn"
+                                                                >
+                                                                    <ExternalLink size={16} className="group-hover/btn:scale-110 transition-transform" /> PIN VIEW
+                                                                </a>
+                                                            </motion.div>
+                                                        ))
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* AI Assistant Sidebar */}
+                                    <div className="lg:col-span-4 h-full">
+                                        <motion.div
+                                            initial={{ opacity: 0, x: 20 }}
+                                            animate={{ opacity: 1, x: 0 }}
+                                            className="glass-card p-0 flex flex-col h-[750px] sticky top-24 border-primary/20 shadow-2xl shadow-primary/5 overflow-hidden"
+                                        >
+                                            {/* AI Header */}
+                                            <div className="p-6 bg-slate-900 flex flex-col gap-4">
+                                                <div className="flex items-center justify-between">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="p-2 bg-primary/20 rounded-lg text-primary">
+                                                            <MessageCircle size={24} />
+                                                        </div>
+                                                        <span className="text-xl font-black text-white font-display">Clinical AI</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-1.5 bg-emerald-500/10 text-emerald-400 px-3 py-1 rounded-full text-[10px] font-black uppercase border border-emerald-500/20">
+                                                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> Live Node
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    onClick={handleAnalyze}
+                                                    disabled={isAnalyzing}
+                                                    className="w-full bg-primary py-3 rounded-xl flex items-center justify-center gap-2 text-sm font-black text-white hover:brightness-110 transition-all shadow-lg shadow-primary/30"
+                                                >
+                                                    <div className="flex items-center justify-center gap-2">
+                                                        <Zap size={16} />
+                                                        <span>{isAnalyzing ? 'Processing History...' : 'Generate Auto-Summary'}</span>
+                                                    </div>
+                                                </button>
+                                            </div>
+
+                                            {/* Chat History */}
+                                            <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar bg-slate-50/50">
+                                                {chatMessages.map((msg, i) => (
+                                                    <div key={i} className={`flex ${msg.isAi ? 'justify-start' : 'justify-end'}`}>
+                                                        <div className={`max-w-[90%] p-4 rounded-3xl text-sm leading-relaxed ${msg.isAi
+                                                            ? 'bg-white text-slate-700 shadow-sm border border-slate-100 font-medium'
+                                                            : 'bg-primary text-white font-bold shadow-lg shadow-primary/20'
+                                                            }`}>
+                                                            {msg.text}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                                {insights.length > 0 && (
+                                                    <div className="space-y-3 mt-6">
+                                                        {insights.map((insight, i) => (
+                                                            <InsightCard key={i} {...insight} />
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {/* Chat Input */}
+                                            <div className="p-6 bg-white border-t border-slate-100">
+                                                <form onSubmit={handleSendMessage} className="flex gap-3">
+                                                    <input
+                                                        type="text"
+                                                        value={inputMessage}
+                                                        onChange={(e) => setInputMessage(e.target.value)}
+                                                        placeholder="Ask clinical queries..."
+                                                        className="flex-1 p-4 bg-slate-50 rounded-2xl text-sm font-bold border-none focus:ring-2 focus:ring-primary/20 outline-none placeholder:text-slate-300"
+                                                    />
+                                                    <button type="submit" className="p-4 bg-slate-900 text-white rounded-2xl hover:bg-black transition-all shadow-lg active:scale-95">
+                                                        <Send size={18} />
+                                                    </button>
+                                                </form>
+                                            </div>
+                                        </motion.div>
+                                    </div>
+                                </div>
+                            )}
+                        </motion.div>
+                    )}
+                </AnimatePresence>
 
                 <AnimatePresence>
                     {uploadSuccess && (
@@ -187,17 +540,23 @@ const DoctorDashboard = () => {
                             initial={{ opacity: 0, x: 20 }}
                             animate={{ opacity: 1, x: 0 }}
                             exit={{ opacity: 0, x: 20 }}
-                            className="fixed bottom-8 right-8 bg-[#1FA97A] text-white p-4 rounded-xl shadow-lg flex items-center gap-3"
+                            className="fixed bottom-8 right-8 bg-emerald-500 text-white p-5 rounded-3xl shadow-2xl shadow-emerald-500/20 flex items-center gap-4 z-50 border border-white/20"
                         >
-                            <CheckCircle />
+                            <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
+                                <CheckCircle size={20} />
+                            </div>
                             <div>
-                                <p className="font-bold">Success!</p>
-                                <p className="text-sm opacity-90">Report uploaded and linked to ABHA</p>
+                                <p className="font-black uppercase tracking-widest text-[10px] opacity-70">Protocol Success</p>
+                                <p className="font-bold">Record Pinned to IPFS</p>
                             </div>
                         </motion.div>
                     )}
                 </AnimatePresence>
             </div>
+
+            {/* Background Blob Decor */}
+            <div className="fixed -top-20 -right-20 w-96 h-96 bg-primary/5 rounded-full blur-[100px] pointer-events-none -z-10" />
+            <div className="fixed -bottom-20 -left-20 w-96 h-96 bg-secondary/5 rounded-full blur-[100px] pointer-events-none -z-10" />
         </div>
     );
 };

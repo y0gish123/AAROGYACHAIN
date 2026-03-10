@@ -1,32 +1,44 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
-import { User, Shield, Key, ArrowRight } from 'lucide-react';
+import { useNavigate, Link } from 'react-router-dom';
+import { User, Shield, Key } from 'lucide-react';
+import axios from 'axios';
 
 const LoginPage = () => {
     const navigate = useNavigate();
-    const [role, setRole] = useState(null); // 'Patient' or 'Doctor'
     const [id, setId] = useState('');
     const [otp, setOtp] = useState('');
-    const [step, setStep] = useState(1); // 1: Role, 2: ID, 3: OTP
+    const [step, setStep] = useState(1); // 1: ID, 2: OTP
+    const [error, setError] = useState('');
 
-    const handleRoleSelect = (selectedRole) => {
-        setRole(selectedRole);
-        setStep(2);
+    const handleIdSubmit = async (e) => {
+        e.preventDefault();
+        setError('');
+        if (id.length < 1) return;
+
+        try {
+            const res = await axios.post('http://localhost:5000/api/auth/patient/generate-otp', { abhaNumber: id });
+            if (res.data.success) {
+                alert(`Your OTP is: ${res.data.otp}`);
+                setStep(2);
+            }
+        } catch (err) {
+            setError(err.response?.data?.message || 'Failed to generate OTP. Ensure backend is running.');
+        }
     };
 
-    const handleIdSubmit = (e) => {
+    const handleLogin = async (e) => {
         e.preventDefault();
-        setStep(3);
-    };
+        setError('');
 
-    const handleLogin = (e) => {
-        e.preventDefault();
-        // Mock Login
-        if (role === 'Patient') {
-            navigate('/patient-dashboard');
-        } else {
-            navigate('/doctor-dashboard');
+        try {
+            const res = await axios.post('http://localhost:5000/api/auth/patient/login', { abhaNumber: id, otp });
+            if (res.data.success) {
+                localStorage.setItem('patientData', JSON.stringify(res.data.patient));
+                navigate('/patient-dashboard');
+            }
+        } catch (err) {
+            setError(err.response?.data?.message || 'Failed to login. Ensure backend is running.');
         }
     };
 
@@ -41,45 +53,16 @@ const LoginPage = () => {
                     <div className="w-16 h-16 bg-primary rounded-2xl mx-auto mb-4 flex items-center justify-center">
                         <Shield className="text-white w-8 h-8" />
                     </div>
-                    <h1 className="text-3xl font-bold">Secure Login</h1>
+                    <h1 className="text-3xl font-bold">Patient Login</h1>
                     <p className="text-gray-600 mt-2">Access your digital health ecosystem</p>
                 </div>
 
+                {error && <p className="text-red-500 text-sm text-center mb-4">{error}</p>}
+
                 <AnimatePresence mode="wait">
                     {step === 1 && (
-                        <motion.div
-                            key="step1"
-                            initial={{ x: 20, opacity: 0 }}
-                            animate={{ x: 0, opacity: 1 }}
-                            exit={{ x: -20, opacity: 0 }}
-                            className="space-y-4"
-                        >
-                            <button
-                                onClick={() => handleRoleSelect('Patient')}
-                                className="w-full p-6 glass-card hover:bg-primary/10 transition-all text-left flex items-center justify-between group"
-                            >
-                                <div>
-                                    <h3 className="font-bold text-lg text-primary">I am a Patient</h3>
-                                    <p className="text-sm text-gray-500">Access your ABHA records</p>
-                                </div>
-                                <ArrowRight className="group-hover:translate-x-2 transition-transform" />
-                            </button>
-                            <button
-                                onClick={() => handleRoleSelect('Doctor')}
-                                className="w-full p-6 glass-card hover:bg-secondary/10 transition-all text-left flex items-center justify-between group"
-                            >
-                                <div>
-                                    <h3 className="font-bold text-lg text-secondary">I am a Doctor</h3>
-                                    <p className="text-sm text-gray-500">View and upload patient reports</p>
-                                </div>
-                                <ArrowRight className="group-hover:translate-x-2 transition-transform" />
-                            </button>
-                        </motion.div>
-                    )}
-
-                    {step === 2 && (
                         <motion.form
-                            key="step2"
+                            key="step1"
                             onSubmit={handleIdSubmit}
                             initial={{ x: 20, opacity: 0 }}
                             animate={{ x: 0, opacity: 1 }}
@@ -88,33 +71,29 @@ const LoginPage = () => {
                         >
                             <div className="space-y-2">
                                 <label className="text-sm font-bold flex items-center gap-2">
-                                    <User size={16} /> {role === 'Patient' ? 'ABHA Number' : 'Doctor ID'}
+                                    <User size={16} /> ABHA Number
                                 </label>
                                 <input
                                     type="text"
                                     required
                                     value={id}
-                                    onChange={(e) => setId(e.target.value)}
-                                    placeholder={role === 'Patient' ? "1234-5678-9012" : "D-948573"}
+                                    onChange={(e) => {
+                                        const onlyNums = e.target.value.replace(/\D/g, '');
+                                        if (onlyNums.length <= 12) setId(onlyNums);
+                                    }}
+                                    placeholder="1234-5678-9012"
                                     className="w-full p-4 rounded-xl border border-gray-200 focus:border-primary focus:outline-none transition-all"
                                 />
                             </div>
                             <button type="submit" className="w-full btn-primary py-4">
                                 Continue
                             </button>
-                            <button
-                                type="button"
-                                onClick={() => setStep(1)}
-                                className="w-full text-gray-500 text-sm hover:underline"
-                            >
-                                Back to role selection
-                            </button>
                         </motion.form>
                     )}
 
-                    {step === 3 && (
+                    {step === 2 && (
                         <motion.form
-                            key="step3"
+                            key="step2"
                             onSubmit={handleLogin}
                             initial={{ x: 20, opacity: 0 }}
                             animate={{ x: 0, opacity: 1 }}
@@ -130,7 +109,11 @@ const LoginPage = () => {
                                     required
                                     maxLength={6}
                                     value={otp}
-                                    onChange={(e) => setOtp(e.target.value)}
+                                    onChange={(e) => {
+                                        // Strict numeric validation (strips away any non-numeric character)
+                                        const onlyNums = e.target.value.replace(/\D/g, '');
+                                        setOtp(onlyNums);
+                                    }}
                                     placeholder="000000"
                                     className="w-full p-4 rounded-xl border border-gray-200 focus:border-primary focus:outline-none transition-all text-center text-2xl tracking-[1rem]"
                                 />
@@ -138,12 +121,20 @@ const LoginPage = () => {
                             <button type="submit" className="w-full btn-primary py-4">
                                 Verify & Login
                             </button>
-                            <p className="text-center text-sm text-gray-500">
-                                OTP sent to your registered mobile ending in 4521
-                            </p>
+                            <button
+                                type="button"
+                                onClick={() => setStep(1)}
+                                className="w-full text-gray-500 text-sm hover:underline mt-4"
+                            >
+                                Back
+                            </button>
                         </motion.form>
                     )}
                 </AnimatePresence>
+
+                <div className="mt-6 text-center text-sm text-gray-500">
+                    <Link to="/" className="hover:underline">Back to Home</Link>
+                </div>
             </motion.div>
         </div>
     );

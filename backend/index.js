@@ -11,7 +11,9 @@ app.use(express.json());
 
 // Routes
 const reportRoutes = require('./routes/reportRoutes');
+const authRoutes = require('./routes/authRoutes');
 app.use('/api/reports', reportRoutes);
+app.use('/api/auth', authRoutes);
 
 const PORT = process.env.PORT || 5000;
 
