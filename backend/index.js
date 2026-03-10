@@ -20,4 +20,7 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/aarogyach
         console.log('Connected to MongoDB Atlas');
         app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
     })
-    .catch(err => console.error('MongoDB connection error:', err));
+    .catch(err => {
+        console.error('MongoDB connection error (Starting server anyway for UI testing):', err.message);
+        app.listen(PORT, () => console.log(`Server running on port ${PORT} (WITHOUT DATABASE)`));
+    });

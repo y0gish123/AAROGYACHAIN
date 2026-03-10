@@ -1,27 +1,36 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { Shield } from 'lucide-react';
 
 const Navbar = () => {
     return (
-        <nav className="fixed top-0 left-0 right-0 z-50 px-6 py-4">
-            <motion.div
-                initial={{ y: -100 }}
-                animate={{ y: 0 }}
-                className="max-w-7xl mx-auto glass-card px-8 py-4 flex items-center justify-between"
-            >
-                <Link to="/" className="text-2xl font-bold text-primary no-underline flex items-center gap-2">
-                    <div className="w-8 h-8 bg-primary rounded-lg"></div>
-                    Aarogya Chain
+        <nav className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-100">
+            <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+                {/* Left: Logo */}
+                <Link to="/" className="flex items-center gap-3 no-underline group transition-transform hover:scale-105">
+                    <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20 group-hover:rotate-12 transition-transform">
+                        <Shield className="text-white w-6 h-6" />
+                    </div>
+                    <span className="text-2xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-blue-700">
+                        Aarogya Chain
+                    </span>
                 </Link>
 
-                <div className="hidden md:flex items-center gap-8 font-medium">
-                    <a href="#features" className="text-text hover:text-primary no-underline transition-colors">Features</a>
-                    <a href="#security" className="text-text hover:text-primary no-underline transition-colors">Security</a>
-                    <a href="#contact" className="text-text hover:text-primary no-underline transition-colors">Contact</a>
-                    <Link to="/login" className="btn-primary no-underline">Login</Link>
+                {/* Center: Links */}
+                <div className="hidden lg:flex items-center gap-10">
+                    <a href="#features" className="nav-link no-underline">Features</a>
+                    <a href="#security" className="nav-link no-underline">Security</a>
+                    <a href="#contact" className="nav-link no-underline">Contact</a>
                 </div>
-            </motion.div>
+
+                {/* Right: Login */}
+                <div>
+                    <Link to="/login" className="btn-primary no-underline text-base px-6 py-3">
+                        Login
+                    </Link>
+                </div>
+            </div>
         </nav>
     );
 };

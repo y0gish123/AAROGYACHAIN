@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import LandingPage from './pages/LandingPage/LandingPage';
+import LoginPage from './pages/LoginPage/LoginPage';
 import PatientDashboard from './pages/PatientDashboard/PatientDashboard';
 import DoctorDashboard from './pages/DoctorDashboard/DoctorDashboard';
 import './index.css';
@@ -10,11 +11,12 @@ function App() {
     <Router>
       <Routes>
         <Route path="/" element={<LandingPage />} />
+        <Route path="/login" element={<LoginPage />} />
         <Route path="/patient-dashboard" element={<PatientDashboard />} />
         <Route path="/doctor-dashboard" element={<DoctorDashboard />} />
-        <Route path="/login" element={<Navigate to="/patient-dashboard" />} />
-        <Route path="/patient-login" element={<Navigate to="/patient-dashboard" />} />
-        <Route path="/doctor-login" element={<Navigate to="/doctor-dashboard" />} />
+        <Route path="/patient-login" element={<LoginPage />} />
+        <Route path="/doctor-login" element={<LoginPage />} />
+        <Route path="*" element={<Navigate to="/" />} />
       </Routes>
     </Router>
   );

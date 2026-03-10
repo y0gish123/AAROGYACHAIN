@@ -1,71 +1,40 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #2563EB;
+  --color-secondary: #2E8B57;
+  --color-background: #F8FAFC;
+  --color-medical-bg: #F8FAFC;
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
 :root {
-  --primary: #1FA97A;
-  --secondary: #2D89EF;
-  --background: #E8F7F1;
-  --text: #1A2E35;
-  --glass: rgba(255, 255, 255, 0.7);
-  --glass-border: rgba(255, 255, 255, 0.3);
-  --shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.1);
+  --primary: #2563EB;
+  --secondary: #2E8B57;
+  --background: #F8FAFC;
+  --text: #0F172A;
 }
 
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+@layer base {
+  body {
+    @apply bg-medical-bg text-slate-900 antialiased;
+  }
 }
 
-body {
-  background: var(--background);
-  color: var(--text);
-  overflow-x: hidden;
-}
+@layer components {
+  .glass-card {
+    @apply bg-white/70 backdrop-blur-md border border-white/30 shadow-xl rounded-3xl;
+  }
 
-.glass-card {
-  background: var(--glass);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border: 1px solid var(--glass-border);
-  box-shadow: var(--shadow);
-  border-radius: 20px;
-}
+  .btn-primary {
+    @apply bg-primary text-white px-8 py-4 rounded-2xl font-bold transition-all shadow-lg shadow-blue-500/30 hover:-translate-y-1 hover:brightness-110 hover:shadow-blue-500/40 cursor-pointer;
+  }
 
-.glow-text {
-  text-shadow: 0 0 20px rgba(31, 169, 122, 0.4);
-}
+  .btn-secondary {
+    @apply bg-secondary text-white px-8 py-4 rounded-2xl font-bold transition-all shadow-lg shadow-green-500/30 hover:-translate-y-1 hover:brightness-110 hover:shadow-green-500/40 cursor-pointer;
+  }
 
-.btn-primary {
-  background: var(--primary);
-  color: white;
-  padding: 12px 24px;
-  border-radius: 12px;
-  border: none;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  box-shadow: 0 4px 15px rgba(31, 169, 122, 0.3);
-}
-
-.btn-primary:hover {
-  transform: translateY(-2px);
-  filter: brightness(1.1);
-  box-shadow: 0 6px 20px rgba(31, 169, 122, 0.4);
-}
-
-.btn-secondary {
-  background: var(--secondary);
-  color: white;
-  padding: 12px 24px;
-  border-radius: 12px;
-  border: none;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  box-shadow: 0 4px 15px rgba(45, 137, 239, 0.3);
-}
-
-.btn-secondary:hover {
-  transform: translateY(-2px);
-  filter: brightness(1.1);
-  box-shadow: 0 6px 20px rgba(45, 137, 239, 0.4);
+  .nav-link {
+    @apply text-slate-600 font-medium hover:text-primary transition-colors cursor-pointer;
+  }
 }

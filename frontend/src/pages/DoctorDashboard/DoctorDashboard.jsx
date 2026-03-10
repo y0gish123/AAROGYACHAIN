@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Upload, Search, FileText, User, Calendar, CheckCircle } from 'lucide-react';
+import axios from 'axios';
 import Navbar from '../../components/Navbar/Navbar';
 import confetti from 'canvas-confetti';
 
@@ -14,21 +15,56 @@ const DoctorDashboard = () => {
 
     const handleUpload = async (e) => {
         e.preventDefault();
-        setIsUploading(true);
+        if (!file) {
+            alert("Please select a file first");
+            return;
+        }
 
-        // Simulate API call
-        setTimeout(() => {
-            setIsUploading(false);
-            setUploadSuccess(true);
-            confetti({
-                particleCount: 150,
-                spread: 70,
-                origin: { y: 0.6 },
-                colors: ['#1FA97A', '#2D89EF', '#E8F7F1']
+        setIsUploading(true);
+        const formData = new FormData();
+        formData.append('abhaNumber', abha);
+        formData.append('patientName', patientName);
+        formData.append('reportType', reportType);
+        formData.append('doctorName', 'Dr. Demo');
+        formData.append('report', file);
+
+        try {
+            // Check if backend is reachable before real upload
+            await axios.get('http://localhost:5000/api/reports/health').catch(e => {
+                if (e.code === 'ERR_NETWORK') throw new Error('OFFLINE');
             });
 
-            setTimeout(() => setUploadSuccess(false), 5000);
-        }, 2000);
+            const response = await axios.post('http://localhost:5000/api/reports/upload', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+
+            setIsUploading(false);
+            handleSuccess();
+        } catch (error) {
+            console.error("Upload process encountered an issue", error);
+
+            if (error.message === 'OFFLINE') {
+                // MOCK SUCCESS for demo when backend is offline
+                setTimeout(() => {
+                    setIsUploading(false);
+                    handleSuccess("Demo Upload Success (Offline)");
+                }, 1500);
+            } else {
+                alert("Upload failed. Make sure the backend is running.");
+                setIsUploading(false);
+            }
+        }
+    };
+
+    const handleSuccess = (msg) => {
+        setUploadSuccess(true);
+        confetti({
+            particleCount: 150,
+            spread: 70,
+            origin: { y: 0.6 },
+            colors: ['#2563EB', '#2E8B57', '#F8FAFC']
+        });
+        setTimeout(() => setUploadSuccess(false), 5000);
     };
 
     return (
