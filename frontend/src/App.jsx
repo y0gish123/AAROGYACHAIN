@@ -6,6 +6,7 @@ import PatientDashboard from './pages/PatientDashboard/PatientDashboard';
 import DoctorDashboard from './pages/DoctorDashboard/DoctorDashboard';
 import DoctorLogin from './pages/DoctorLogin/DoctorLogin';
 import DoctorRegister from './pages/DoctorRegister/DoctorRegister';
+import ReportViewer from './pages/ReportViewer/ReportViewer';
 import './index.css';
 
 function App() {
@@ -16,6 +17,7 @@ function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/patient-dashboard" element={<PatientDashboard />} />
         <Route path="/doctor-dashboard" element={<DoctorDashboard />} />
+        <Route path="/report/:id" element={<ReportViewer />} />
         <Route path="/patient-login" element={<LoginPage />} />
         <Route path="/doctor-login" element={<DoctorLogin />} />
         <Route path="/doctor-register" element={<DoctorRegister />} />

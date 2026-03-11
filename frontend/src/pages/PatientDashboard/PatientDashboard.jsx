@@ -18,7 +18,8 @@ import {
 import Navbar from '../../components/Navbar/Navbar';
 import StatCard from '../../components/StatCard';
 import InsightCard from '../../components/InsightCard';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
+import axios from 'axios';
 
 const PatientDashboard = () => {
     const navigate = useNavigate();
@@ -227,15 +228,13 @@ const PatientDashboard = () => {
                                                 </div>
                                             </div>
                                             <div className="flex items-center gap-2">
-                                                <a
-                                                    href={report.ipfsUrl}
-                                                    target="_blank"
-                                                    rel="noreferrer"
+                                                <Link
+                                                    to={`/report/${report._id}`}
                                                     onClick={(e) => e.stopPropagation()}
                                                     className="p-2 hover:bg-primary/10 rounded-xl text-primary"
                                                 >
                                                     <Eye size={20} />
-                                                </a>
+                                                </Link>
                                                 <ChevronRight
                                                     className={`text-gray-300 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
                                                 />

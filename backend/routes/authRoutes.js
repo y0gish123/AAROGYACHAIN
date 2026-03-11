@@ -23,7 +23,7 @@ router.post('/patient/generate-otp', async (req, res) => {
         // Store the OTP against the ABHA number (overwrites any existing)
         otpStore[abhaNumber] = otp;
 
-        return res.json({ success: true, message: 'OTP generated successfully', otp });
+        return res.json({ success: true, message: `OTP generated successfully. Your demo OTP is: ${otp}`, otp });
     } catch (error) {
         console.error("Generate OTP Error:", error);
         return res.status(500).json({ success: false, message: 'Server Error' });
