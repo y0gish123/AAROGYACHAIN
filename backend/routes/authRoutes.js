@@ -47,21 +47,21 @@ router.post('/patient/login', async (req, res) => {
         // Clear OTP after successful validation
         delete otpStore[abhaNumber];
 
-        // Upsert Patient or Fetch Patient (Fallback if DB is disconnected)
+        // Upsert Patient or Fetch Patient
         let patient;
         try {
-            // Check if mongoose is connected before querying to avoid long timeouts/errors
+            // Check if mongoose is connected before querying
             if (mongoose.connection.readyState === 1) {
                 patient = await User.findOne({ abhaNumber, role: 'Patient' });
                 if (!patient) {
                     patient = await User.create({ abhaNumber, name: `Patient-${abhaNumber.slice(-4)}`, role: 'Patient' });
                 }
             } else {
-                throw new Error("Mongoose not connected");
+                throw new Error("Database connection is not available");
             }
         } catch (dbError) {
-            console.log("DB Error during patient login, using mock patient:", dbError.message);
-            patient = { _id: "mock-id", abhaNumber, name: `Patient-${abhaNumber.slice(-4)}`, role: 'Patient' };
+            console.error("DB Error during patient login:", dbError.message);
+            return res.status(500).json({ success: false, message: 'Database connection error. Please try again later.' });
         }
 
         return res.json({ success: true, message: 'Patient login successful', patient });
@@ -126,13 +126,11 @@ router.post('/doctor/login', async (req, res) => {
             if (mongoose.connection.readyState === 1) {
                 doctor = await Doctor.findOne({ uid });
             } else {
-                throw new Error("Mongoose not connected");
+                throw new Error("Database connection is not available");
             }
         } catch (dbError) {
-            console.log("DB Error during doctor login, using mock doctor:", dbError.message);
-            // In mock mode, we'll bypass real authentication and return a mock doctor object
-            doctor = { _id: "mock-doc-id", fullName: "Mock Doctor", uid: uid, password: "mock-password" };
-            return res.json({ success: true, message: 'Doctor login successful (Offline Mode)', doctor: { id: doctor._id, fullName: doctor.fullName, uid: doctor.uid } });
+            console.error("DB Error during doctor login:", dbError.message);
+            return res.status(500).json({ success: false, message: 'Database connection error. Please try again later.' });
         }
 
         if (!doctor) {
@@ -163,16 +161,6 @@ router.get('/patient/:abhaNumber', async (req, res) => {
         }
 
         if (!patient) {
-            // Fallback for demo ABHA
-            if (abhaNumber === '1234567890' || abhaNumber === '123456789012') {
-                return res.json({
-                    success: true,
-                    patient: {
-                        abhaNumber,
-                        name: abhaNumber === '1234567890' ? 'Demo Patient' : 'Patient-9012'
-                    }
-                });
-            }
             return res.status(404).json({ success: false, message: 'Patient not found' });
         }
 

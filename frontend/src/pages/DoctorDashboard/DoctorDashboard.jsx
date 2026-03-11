@@ -119,9 +119,9 @@ const DoctorDashboard = () => {
         setIsScanning(true);
         setTimeout(() => {
             setIsScanning(false);
-            const demoAbha = '1234567890';
-            setSearchQuery(demoAbha);
-            handleSearchPatient(null, demoAbha);
+            // After scanning, you would typically get an ABHA number and then call handleSearchPatient
+            // For example: handleSearchPatient(null, scannedAbhaNumber);
+            setError("QR scanning is active. Please scan an ABHA QR code.");
         }, 2200);
     };
 

@@ -18,11 +18,23 @@ import {
 import Navbar from '../../components/Navbar/Navbar';
 import StatCard from '../../components/StatCard';
 import InsightCard from '../../components/InsightCard';
-import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
 
 const PatientDashboard = () => {
-    // Retrieve data from localStorage with demo fallback
-    const storedPatient = JSON.parse(localStorage.getItem('patientData') || '{"abhaNumber":"1234567890","name":"Demo Patient"}');
+    const navigate = useNavigate();
+
+    // Retrieve data from localStorage
+    const patientDataRaw = localStorage.getItem('patientData');
+
+    React.useEffect(() => {
+        if (!patientDataRaw) {
+            navigate('/login/patient');
+        }
+    }, [patientDataRaw, navigate]);
+
+    if (!patientDataRaw) return null; // Avoid rendering until redirect happens
+
+    const storedPatient = JSON.parse(patientDataRaw);
 
     const [abha, setAbha] = useState(storedPatient.abhaNumber);
     const [patientName, setPatientName] = useState(storedPatient.name);
@@ -64,42 +76,56 @@ const PatientDashboard = () => {
     const [inputMessage, setInputMessage] = useState('');
 
     const handleAnalyze = async () => {
+        if (isAnalyzing) return;
         setIsAnalyzing(true);
-        setChatMessages(prev => [...prev, { text: "Analyzing your medical history...", isAi: false }]);
+        const loadingMessage = { text: "Analyzing your medical history...", isAi: false };
+        setChatMessages(prev => [...prev, loadingMessage]);
+
         try {
             const response = await axios.post('http://localhost:5000/api/reports/analyze', { abhaNumber: abha });
-            setChatMessages(prev => [...prev, { text: response.data.message, isAi: true }]);
-            setInsights(response.data.insights);
+
+            // Remove loading message and add real response
+            setChatMessages(prev => {
+                const newMessages = prev.filter(m => m !== loadingMessage);
+                return [...newMessages, { text: response.data.message, isAi: true }];
+            });
+            setInsights(response.data.insights || []);
         } catch (error) {
-            const mockMessage = "I've analyzed your records. Your heart rate and blood pressure are stable. I recommend monitoring your iron levels as they were slightly low in your last blood test.";
-            const mockInsights = [
-                { title: "Vitals Check", detail: "Stable & Healthy", color: "bg-green-100 text-green-700" },
-                { title: "Iron Levels", detail: "Slightly Low (11.2)", color: "bg-blue-100 text-blue-700" }
-            ];
-            setTimeout(() => {
-                setChatMessages(prev => [...prev, { text: mockMessage, isAi: true }]);
-                setInsights(mockInsights);
-            }, 1000);
+            console.error("Analysis Failed:", error);
+            setChatMessages(prev => {
+                const newMessages = prev.filter(m => m !== loadingMessage);
+                return [...newMessages, { text: "I'm sorry, I'm having trouble analyzing your records right now. Please try again later.", isAi: true }];
+            });
         } finally {
             setIsAnalyzing(false);
         }
     };
 
-    const handleSendMessage = (e) => {
+    const handleSendMessage = async (e) => {
         e.preventDefault();
-        if (!inputMessage.trim()) return;
+        if (!inputMessage.trim() || isAnalyzing) return;
 
         const userMsg = inputMessage;
-        setChatMessages(prev => [...prev, { text: userMsg, isAi: false }]);
+        const newHistory = [...chatMessages, { text: userMsg, isAi: false }];
+
+        setChatMessages(newHistory);
         setInputMessage('');
+        setIsAnalyzing(true);
 
-        setTimeout(() => {
-            let aiResponse = "I'm here to help. Are you asking about a specific report or vital?";
-            if (userMsg.toLowerCase().includes('heart')) aiResponse = "Your recent heart rate was 72 bpm, which is within the ideal range.";
-            if (userMsg.toLowerCase().includes('iron') || userMsg.toLowerCase().includes('blood')) aiResponse = "Your last blood test showed hemoglobin at 11.2 g/dL. We should aim for 12.0+.";
+        try {
+            const response = await axios.post('http://localhost:5000/api/reports/chat', {
+                abhaNumber: abha,
+                message: userMsg,
+                history: chatMessages // Send previous history (excluding current message)
+            });
 
-            setChatMessages(prev => [...prev, { text: aiResponse, isAi: true }]);
-        }, 800);
+            setChatMessages(prev => [...prev, { text: response.data.message, isAi: true }]);
+        } catch (error) {
+            console.error("Chat Failed:", error);
+            setChatMessages(prev => [...prev, { text: "Sorry, I couldn't process your request. Please try again.", isAi: true }]);
+        } finally {
+            setIsAnalyzing(false);
+        }
     };
 
     return (
@@ -123,9 +149,9 @@ const PatientDashboard = () => {
                                 </p>
                             </div>
                             <div className="p-4 bg-primary/10 rounded-2xl flex items-center gap-3">
-                                <div className={`w-3 h-3 ${isDemoMode ? 'bg-yellow-500' : 'bg-green-500'} rounded-full animate-pulse`}></div>
+                                <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
                                 <span className="text-primary font-bold">
-                                    {isDemoMode ? 'Demo Records' : 'Live Health Data'}
+                                    Live Health Data
                                 </span>
                             </div>
                         </div>
@@ -267,18 +293,32 @@ const PatientDashboard = () => {
                         </div>
 
                         <div className="flex-1 bg-white/50 rounded-2xl p-4 overflow-y-auto mb-4 space-y-4 scrollbar-hide">
+                            {/* Chat Messages */}
                             {chatMessages.map((msg, i) => (
-                                <div key={i} className={`${msg.isAi ? 'bg-secondary/10 rounded-tl-none mr-8' : 'bg-primary/10 rounded-tr-none ml-8'} p-3 rounded-2xl text-sm`}>
-                                    {msg.text}
+                                <div key={i} className={`flex ${msg.isAi ? 'justify-start' : 'justify-end'}`}>
+                                    <div className={`max-w-[85%] ${msg.isAi ? 'bg-secondary/10 rounded-tl-none mr-8' : 'bg-primary text-white rounded-tr-none ml-8'} p-3 rounded-2xl text-sm whitespace-pre-wrap leading-relaxed`}>
+                                        {msg.text}
+                                    </div>
                                 </div>
                             ))}
+                            {isAnalyzing && (
+                                <div className="flex justify-start">
+                                    <div className="bg-secondary/10 rounded-2xl rounded-tl-none p-3 max-w-[85%] text-sm flex gap-1 items-center text-secondary">
+                                        <div className="w-1.5 h-1.5 bg-secondary rounded-full animate-bounce"></div>
+                                        <div className="w-1.5 h-1.5 bg-secondary rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                                        <div className="w-1.5 h-1.5 bg-secondary rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
+                                    </div>
+                                </div>
+                            )}
 
                             {/* AI Insight Cards in Chat */}
-                            <div className="space-y-3">
-                                {insights.map((insight, i) => (
-                                    <InsightCard key={i} title={insight.title} detail={insight.detail} color={insight.color} />
-                                ))}
-                            </div>
+                            {insights.length > 0 && (
+                                <div className="space-y-3 pt-2">
+                                    {insights.map((insight, i) => (
+                                        <InsightCard key={i} title={insight.title} detail={insight.detail} color={insight.color} />
+                                    ))}
+                                </div>
+                            )}
                         </div>
 
                         <form onSubmit={handleSendMessage} className="space-y-2">

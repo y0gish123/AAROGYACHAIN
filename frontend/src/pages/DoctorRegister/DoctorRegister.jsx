@@ -31,10 +31,6 @@ const DoctorRegister = () => {
             }
         } catch (err) {
             setError(err.response?.data?.message || 'Failed to register. Ensure backend is running.');
-            // Fallback for mock/offline environment
-            if (err.message === 'Network Error' || err.code === 'ERR_NETWORK') {
-                setTimeout(() => navigate('/doctor-login'), 1000); // mock success
-            }
         }
     };
 

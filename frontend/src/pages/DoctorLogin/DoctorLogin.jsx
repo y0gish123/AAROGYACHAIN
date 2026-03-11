@@ -22,14 +22,7 @@ const DoctorLogin = () => {
         } catch (err) {
             setError(err.response?.data?.message || 'Failed to login. Ensure backend is running.');
 
-            // Fallback for mock environment if strictly needed, but per prompt we need validation
-            if (err.message === 'Network Error' || err.code === 'ERR_NETWORK') {
-                if (uid === 'D-948573' && password === 'test') {
-                    navigate('/doctor-dashboard');
-                } else {
-                    setError('Offline Mode: Use UID "D-948573" and password "test".');
-                }
-            }
+            setError(err.response?.data?.message || 'Failed to login. Ensure backend is running.');
         }
     };
 
