@@ -5,6 +5,13 @@ const mongoose = require('mongoose');
 const Doctor = require('../models/Doctor');
 const User = require('../models/User'); // For Patient
 
+// Demo ABHA Numbers for Whitelist
+const DEMO_ABHA_NUMBERS = [
+    '95847362514091',
+    '37209184655237',
+    '61048273952104'
+];
+
 // Temporary in-memory store for OTPs (for demo purposes)
 const otpStore = {};
 
@@ -13,8 +20,13 @@ router.post('/patient/generate-otp', async (req, res) => {
     try {
         const { abhaNumber } = req.body;
 
-        if (!abhaNumber) {
-            return res.status(400).json({ success: false, message: 'ABHA Number is required' });
+        if (!abhaNumber || abhaNumber.length !== 14) {
+            return res.status(400).json({ success: false, message: 'ABHA Number must be exactly 14 digits' });
+        }
+
+        // Check if ABHA number is in the demo whitelist
+        if (!DEMO_ABHA_NUMBERS.includes(abhaNumber)) {
+            return res.status(404).json({ success: false, message: 'Invalid ABHA number' });
         }
 
         // Generate a random 6-digit OTP
@@ -35,8 +47,8 @@ router.post('/patient/login', async (req, res) => {
     try {
         const { abhaNumber, otp } = req.body;
 
-        if (!abhaNumber || !otp) {
-            return res.status(400).json({ success: false, message: 'ABHA Number and OTP are required' });
+        if (!abhaNumber || !otp || abhaNumber.length !== 14) {
+            return res.status(400).json({ success: false, message: 'Valid 14-digit ABHA Number and OTP are required' });
         }
 
         // Validate OTP
