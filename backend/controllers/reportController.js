@@ -2,9 +2,10 @@ const Report = require('../models/Report');
 const axios = require('axios');
 const fs = require('fs');
 const FormData = require('form-data');
-const { GoogleGenAI } = require('@google/genai');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
+const pdf = require('pdf-parse');
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 const uploadToPinata = async (filePath, fileName) => {
     const url = `https://api.pinata.cloud/pinning/pinFileToIPFS`;
@@ -30,8 +31,11 @@ const uploadToPinata = async (filePath, fileName) => {
 
 exports.uploadReport = async (req, res) => {
     try {
-        const { abhaNumber, patientName, reportType, doctorName, date } = req.body;
+        let { abhaNumber, patientName, reportType, doctorName, date } = req.body;
         const file = req.file;
+
+        // Normalize ABHA: Strip spaces/dashes
+        abhaNumber = abhaNumber.replace(/\D/g, '');
 
         if (!file) return res.status(400).json({ error: 'No report file uploaded' });
 
@@ -44,13 +48,42 @@ exports.uploadReport = async (req, res) => {
             }
         }
 
+        // PDF Text Extraction & AI Summary Generation
+        let extractedText = "";
+        let aiSummary = `Automated analysis for ${reportType}. Visual inspection completed.`;
+
+        if (file && file.mimetype === 'application/pdf') {
+            try {
+                const dataBuffer = fs.readFileSync(file.path);
+                const pdfData = await pdf(dataBuffer);
+                extractedText = pdfData.text;
+
+                if (extractedText.trim()) {
+                    // Generate AI Summary using Gemini
+                    const summaryPrompt = `
+                    You are a professional medical scribe. Summarize the following medical report text in 2-3 concise sentences. 
+                    Focus on key findings, vitals, or diagnoses. If the text is illegible or not a medical report, return a generic summary.
+                    
+                    Report Content:
+                    ${extractedText.substring(0, 5000)} // Limit context to 5k chars
+                    `;
+
+                    const model = genAI.getGenerativeModel({ model: "gemini-flash-lite-latest" });
+                    const summaryResponse = await model.generateContent(summaryPrompt);
+                    aiSummary = summaryResponse.response.text().trim();
+                }
+            } catch (err) {
+                console.error("PDF Parsing/Summary error:", err.message);
+            }
+        }
+
         const newReport = await Report.create({
             abhaNumber,
             patientName,
             reportType,
             doctorName,
             ipfsUrl,
-            summary: `Automated analysis for ${reportType}. Visual inspection completed.`,
+            summary: aiSummary,
             date: date || new Date()
         });
 
@@ -64,7 +97,9 @@ exports.uploadReport = async (req, res) => {
 
 exports.analyzeHealth = async (req, res) => {
     try {
-        const { abhaNumber } = req.body;
+        let { abhaNumber } = req.body;
+        // Normalize ABHA
+        abhaNumber = abhaNumber.replace(/\D/g, '');
 
         let reports = await Report.find({ abhaNumber }).sort({ date: -1 }).limit(5);
 
@@ -108,13 +143,12 @@ exports.analyzeHealth = async (req, res) => {
         }
         Return exactly 3 insights highlighting key takeaways from the reports. ONLY return raw JSON, no markdown formatting like \`\`\`json.`;
 
-        const response = await ai.models.generateContent({
-            model: 'gemini-2.5-flash',
-            contents: prompt,
-        });
+        const model = genAI.getGenerativeModel({ model: "gemini-flash-lite-latest" });
+        const result = await model.generateContent(prompt);
+        const responseText = result.response.text();
 
         // Clean up any potential markdown from Gemini's response
-        let rawResponse = response.text;
+        let rawResponse = responseText;
         if (rawResponse.startsWith('```json')) {
             rawResponse = rawResponse.replace(/```json\n?/, '').replace(/```\n?$/, '').trim();
         }
@@ -123,14 +157,16 @@ exports.analyzeHealth = async (req, res) => {
         res.json(aiData);
 
     } catch (err) {
-        console.error('Gemini Analysis Error:', err);
+        console.error('Gemini Analysis Error:', err.message);
         res.status(500).json({ error: 'AI analysis failed' });
     }
 };
 
 exports.chatWithAI = async (req, res) => {
     try {
-        const { abhaNumber, message, history } = req.body;
+        let { abhaNumber, message, history } = req.body;
+        // Normalize ABHA
+        abhaNumber = abhaNumber.replace(/\D/g, '');
 
         let reports = await Report.find({ abhaNumber }).sort({ date: -1 }).limit(5);
 
@@ -156,6 +192,7 @@ exports.chatWithAI = async (req, res) => {
         }
 
         const reportContext = reports.map(r => `[${new Date(r.date).toLocaleDateString()}] ${r.reportType}: ${r.summary}`).join('\n');
+        console.log(`[AI Chat] Context for ABHA ${abhaNumber}:`, reportContext || "No records found.");
 
         const systemPrompt = `You are 'Aarogya AI', a professional and empathetic medical AI assistant. Answer the user's questions based ONLY on their medical records provided below. If they ask something unrelated to their records, politely redirect them. Keep responses concise and easy to understand.
         
@@ -164,30 +201,48 @@ exports.chatWithAI = async (req, res) => {
         `;
 
         // Format history for Gemini
-        const formattedHistory = history.map(msg => ({
+        let formattedHistory = history.map(msg => ({
             role: msg.isAi ? 'model' : 'user',
             parts: [{ text: msg.text }]
         }));
 
-        const chat = ai.chats.create({
-            model: "gemini-2.5-flash",
-            systemInstruction: systemPrompt,
-            history: formattedHistory
+        // SDK requires first message to be from 'user' and roles must alternate
+        while (formattedHistory.length > 0 && formattedHistory[0].role === 'model') {
+            formattedHistory.shift();
+        }
+
+        // Filter to ensure alternating roles (very basic enforcement)
+        formattedHistory = formattedHistory.filter((msg, i, arr) => {
+            return i === 0 || msg.role !== arr[i - 1].role;
         });
 
-        const response = await chat.sendMessage({ message });
+        const model = genAI.getGenerativeModel({ 
+            model: "gemini-flash-lite-latest",
+            systemInstruction: systemPrompt 
+        });
 
-        res.json({ message: response.text });
+        const chat = model.startChat({
+            history: formattedHistory,
+            generationConfig: {
+                maxOutputTokens: 500,
+            },
+        });
+
+        const result = await chat.sendMessage(message);
+        const responseText = result.response.text();
+
+        res.json({ message: responseText });
 
     } catch (err) {
-        console.error('Gemini Chat Error:', err);
+        console.error('Gemini Chat Error:', err.message);
         res.status(500).json({ error: 'AI chat failed' });
     }
 };
 
 exports.getReportsByAbha = async (req, res) => {
     try {
-        const reports = await Report.find({ abhaNumber: req.params.abha }).sort({ date: -1 });
+        const abhaNumber = req.params.abha.replace(/\D/g, '');
+        const reports = await Report.find({ abhaNumber }).sort({ date: -1 });
 
         res.json(reports);
     } catch (err) {

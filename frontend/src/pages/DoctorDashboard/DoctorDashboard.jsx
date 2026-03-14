@@ -62,7 +62,8 @@ const DoctorDashboard = () => {
 
         setIsUploading(true);
         const formData = new FormData();
-        formData.append('abhaNumber', abha);
+        // Normalize ABHA for storage
+        formData.append('abhaNumber', abha.replace(/\D/g, ''));
         formData.append('patientName', patientName);
         formData.append('reportType', reportType);
         formData.append('doctorName', 'Dr. Demo');
@@ -147,20 +148,31 @@ const DoctorDashboard = () => {
         }
     };
 
-    const handleSendMessage = (e) => {
+    const handleSendMessage = async (e) => {
         e.preventDefault();
-        if (!inputMessage.trim()) return;
+        if (!inputMessage.trim() || isAnalyzing) return;
 
         const userMsg = inputMessage;
-        setChatMessages(prev => [...prev, { text: userMsg, isAi: false }]);
+        const newHistory = [...chatMessages, { text: userMsg, isAi: false }];
+        setChatMessages(newHistory);
         setInputMessage('');
+        setIsAnalyzing(true);
 
-        setTimeout(() => {
-            let aiResponse = "As your AI clinical co-pilot, I've analyzed the patient's records. Their overall health trajectory remains positive.";
-            if (userMsg.toLowerCase().includes('heart')) aiResponse = "Current heart rate: 72 bpm. Historical variance: ±4 bpm. Status: Normal.";
-            if (userMsg.toLowerCase().includes('bp')) aiResponse = "Latest BP: 120/80 mmHg. No hypertensive indicators found in recent diagnostic uploads.";
-            setChatMessages(prev => [...prev, { text: aiResponse, isAi: true }]);
-        }, 600);
+        try {
+            // Doctors can also chat with AI about the searched patient
+            const response = await axios.post('http://localhost:5000/api/reports/chat', {
+                abhaNumber: searchedPatient.abhaNumber,
+                message: userMsg,
+                history: chatMessages
+            });
+
+            setChatMessages(prev => [...prev, { text: response.data.message, isAi: true }]);
+        } catch (error) {
+            console.error("Chat Failed:", error);
+            setChatMessages(prev => [...prev, { text: "Sorry, I couldn't process your request. Please try again.", isAi: true }]);
+        } finally {
+            setIsAnalyzing(false);
+        }
     };
 
     const handleSuccess = () => {
@@ -222,9 +234,12 @@ const DoctorDashboard = () => {
                                             <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-primary transition-colors" size={20} />
                                             <input
                                                 type="text"
-                                                value={abha}
-                                                onChange={(e) => setAbha(e.target.value.replace(/\D/g, '').slice(0, 12))}
-                                                placeholder="12 digit ABHA"
+                                                onChange={(e) => {
+                                                    const onlyNums = e.target.value.replace(/\D/g, '');
+                                                    if (onlyNums.length <= 14) setAbha(onlyNums);
+                                                }}
+                                                value={abha.replace(/(\d{4})(?=\d)/g, '$1 ')}
+                                                placeholder="0000 0000 0000 00"
                                                 className="w-full pl-12 pr-4 py-4 rounded-2xl bg-slate-50 border-2 border-transparent focus:bg-white focus:border-primary/20 outline-none transition-all font-medium"
                                                 required
                                             />
@@ -309,7 +324,7 @@ const DoctorDashboard = () => {
                                         </div>
                                     </div>
                                 </div>
-                                <div className="glass-card p-8 bg-white">
+                                <div className="glass-card p-8 text-white">
                                     <h4 className="text-sm font-black uppercase tracking-widest text-slate-400 mb-6">Live Health Network</h4>
                                     <div className="space-y-6">
                                         {[1, 2, 3].map(i => (
@@ -343,9 +358,13 @@ const DoctorDashboard = () => {
                                         <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-primary transition-colors" size={24} />
                                         <input
                                             type="text"
-                                            value={searchQuery}
-                                            onChange={(e) => setSearchQuery(e.target.value)}
-                                            placeholder="Verify via ABHA Number (e.g. 123456789012)"
+                                            required={false}
+                                            onChange={(e) => {
+                                                const onlyNums = e.target.value.replace(/\D/g, '');
+                                                if (onlyNums.length <= 14) setSearchQuery(onlyNums);
+                                            }}
+                                            value={searchQuery.replace(/(\d{4})(?=\d)/g, '$1 ')}
+                                            placeholder="Verify via 14-digit ABHA Number"
                                             className="w-full pl-16 pr-6 py-6 rounded-3xl bg-slate-50 border-2 border-transparent focus:bg-white focus:border-primary/20 outline-none transition-all text-xl font-medium shadow-inner"
                                         />
                                     </div>

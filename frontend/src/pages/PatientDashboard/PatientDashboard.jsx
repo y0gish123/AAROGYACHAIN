@@ -48,7 +48,8 @@ const PatientDashboard = () => {
         const fetchReports = async () => {
             setLoading(true);
             try {
-                const response = await axios.get(`http://localhost:5000/api/reports/${abha}`);
+                const cleanAbha = abha.replace(/\D/g, '');
+                const response = await axios.get(`http://localhost:5000/api/reports/${cleanAbha}`);
                 setReports(response.data);
                 setIsDemoMode(response.data.some(r => r._id.startsWith('mock')));
             } catch (error) {
@@ -279,70 +280,125 @@ const PatientDashboard = () => {
                     <motion.div
                         initial={{ opacity: 0, x: 20 }}
                         animate={{ opacity: 1, x: 0 }}
-                        className="glass-card p-6 h-[calc(100vh-140px)] sticky top-28 flex flex-col"
+                        className="glass-card border-none bg-white/40 backdrop-blur-xl h-[calc(100vh-140px)] sticky top-28 flex flex-col shadow-2xl shadow-primary/5 overflow-hidden"
                     >
-                        <div className="flex items-center gap-3 mb-6">
-                            <div className="p-2 bg-secondary/10 rounded-lg">
-                                <MessageCircle className="text-secondary" />
-                            </div>
-                            <div>
-                                <h2 className="font-bold">Aarogya AI</h2>
-                                <p className="text-xs text-secondary font-semibold">Ready to help</p>
+                        {/* Chat Header */}
+                        <div className="p-6 border-b border-primary/5 bg-gradient-to-r from-primary/5 to-secondary/5">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <div className="relative">
+                                        <div className="p-2.5 bg-white rounded-xl shadow-sm border border-primary/10">
+                                            <MessageCircle className="text-primary" size={20} />
+                                        </div>
+                                        <div className="absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-green-500 border-2 border-white rounded-full"></div>
+                                    </div>
+                                    <div>
+                                        <h2 className="font-bold text-gray-900 leading-tight">Aarogya AI</h2>
+                                        <p className="text-[10px] text-green-600 font-bold uppercase tracking-wider flex items-center gap-1">
+                                            <span className="w-1 h-1 bg-green-500 rounded-full animate-ping"></span>
+                                            Online & Secure
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="flex gap-2">
+                                    <button className="p-2 hover:bg-white rounded-lg transition-colors text-gray-400 hover:text-primary">
+                                        <Activity size={18} />
+                                    </button>
+                                </div>
                             </div>
                         </div>
 
-                        <div className="flex-1 bg-white/50 rounded-2xl p-4 overflow-y-auto mb-4 space-y-4 scrollbar-hide">
-                            {/* Chat Messages */}
-                            {chatMessages.map((msg, i) => (
-                                <div key={i} className={`flex ${msg.isAi ? 'justify-start' : 'justify-end'}`}>
-                                    <div className={`max-w-[85%] ${msg.isAi ? 'bg-secondary/10 rounded-tl-none mr-8' : 'bg-primary text-white rounded-tr-none ml-8'} p-3 rounded-2xl text-sm whitespace-pre-wrap leading-relaxed`}>
-                                        {msg.text}
-                                    </div>
-                                </div>
-                            ))}
+                        {/* Chat Messages Area */}
+                        <div className="flex-1 overflow-y-auto p-6 space-y-6 scrollbar-hide">
+                            <AnimatePresence mode="popLayout">
+                                {chatMessages.map((msg, i) => (
+                                    <motion.div
+                                        key={i}
+                                        initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                                        className={`flex ${msg.isAi ? 'justify-start' : 'justify-end'}`}
+                                    >
+                                        <div className={`relative max-w-[88%] group`}>
+                                            <div className={`
+                                                px-4 py-3 rounded-2xl text-sm leading-relaxed shadow-sm
+                                                ${msg.isAi 
+                                                    ? 'bg-white text-gray-800 rounded-tl-none border border-primary/5' 
+                                                    : 'bg-primary text-white rounded-tr-none shadow-primary/20'}
+                                            `}>
+                                                {msg.text}
+                                            </div>
+                                            <span className={`text-[10px] mt-1 block opacity-0 group-hover:opacity-100 transition-opacity ${msg.isAi ? 'text-gray-400' : 'text-primary/60 text-right'}`}>
+                                                {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                            </span>
+                                        </div>
+                                    </motion.div>
+                                ))}
+                            </AnimatePresence>
+                            
                             {isAnalyzing && (
-                                <div className="flex justify-start">
-                                    <div className="bg-secondary/10 rounded-2xl rounded-tl-none p-3 max-w-[85%] text-sm flex gap-1 items-center text-secondary">
-                                        <div className="w-1.5 h-1.5 bg-secondary rounded-full animate-bounce"></div>
-                                        <div className="w-1.5 h-1.5 bg-secondary rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                                        <div className="w-1.5 h-1.5 bg-secondary rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
+                                <motion.div 
+                                    initial={{ opacity: 0 }} 
+                                    animate={{ opacity: 1 }}
+                                    className="flex justify-start"
+                                >
+                                    <div className="bg-white border border-primary/5 rounded-2xl rounded-tl-none p-4 shadow-sm flex gap-1.5 items-center">
+                                        <div className="w-1.5 h-1.5 bg-primary/40 rounded-full animate-bounce" style={{ animationDelay: '0s' }}></div>
+                                        <div className="w-1.5 h-1.5 bg-primary/60 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                                        <div className="w-1.5 h-1.5 bg-primary/80 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
                                     </div>
-                                </div>
+                                </motion.div>
                             )}
 
                             {/* AI Insight Cards in Chat */}
                             {insights.length > 0 && (
-                                <div className="space-y-3 pt-2">
+                                <motion.div 
+                                    initial={{ opacity: 0, y: 20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    className="space-y-3 pt-4 border-t border-primary/5"
+                                >
+                                    <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-1">Deep Health Insights</h4>
                                     {insights.map((insight, i) => (
                                         <InsightCard key={i} title={insight.title} detail={insight.detail} color={insight.color} />
                                     ))}
-                                </div>
+                                </motion.div>
                             )}
                         </div>
 
-                        <form onSubmit={handleSendMessage} className="space-y-2">
-                            <button
-                                type="button"
-                                onClick={handleAnalyze}
-                                disabled={isAnalyzing}
-                                className="w-full btn-secondary py-3 text-sm flex items-center justify-center gap-2 shadow-lg shadow-secondary/20"
-                            >
-                                {isAnalyzing ? <Activity className="animate-spin" size={16} /> : <AlertCircle size={16} />}
-                                {isAnalyzing ? "Processing History..." : "Generate AI Insights"}
-                            </button>
-                            <div className="flex gap-2">
-                                <input
-                                    type="text"
-                                    value={inputMessage}
-                                    onChange={(e) => setInputMessage(e.target.value)}
-                                    placeholder="Ask about your records..."
-                                    className="flex-1 p-3 rounded-xl border border-gray-100 focus:outline-none focus:border-secondary transition-all text-sm bg-white/80"
-                                />
-                                <button type="submit" className="bg-secondary text-white rounded-xl p-3 hover:scale-105 transition-transform">
-                                    <Send size={18} />
+                        {/* Chat Input Area */}
+                        <div className="p-6 bg-white/60 backdrop-blur-md border-t border-primary/5">
+                            <form onSubmit={handleSendMessage} className="space-y-3">
+                                <button
+                                    type="button"
+                                    onClick={handleAnalyze}
+                                    disabled={isAnalyzing}
+                                    className="w-full relative group overflow-hidden bg-white border border-secondary/20 hover:border-secondary transition-all py-2.5 rounded-xl text-xs font-bold text-secondary flex items-center justify-center gap-2 overflow-hidden"
+                                >
+                                    <div className="absolute inset-0 bg-gradient-to-r from-secondary/5 to-transparent translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></div>
+                                    {isAnalyzing ? <Activity className="animate-spin" size={14} /> : <AlertCircle size={14} />}
+                                    {isAnalyzing ? "Analyzing Medical History..." : "Generate AI Health Summary"}
                                 </button>
-                            </div>
-                        </form>
+                                
+                                <div className="relative flex items-center gap-2">
+                                    <input
+                                        type="text"
+                                        value={inputMessage}
+                                        onChange={(e) => setInputMessage(e.target.value)}
+                                        placeholder="Ask about your records..."
+                                        className="flex-1 bg-white border border-primary/10 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all pr-12 placeholder:text-gray-400"
+                                    />
+                                    <button 
+                                        type="submit" 
+                                        disabled={!inputMessage.trim() || isAnalyzing}
+                                        className="absolute right-1.5 p-2 bg-primary text-white rounded-lg shadow-lg shadow-primary/20 hover:scale-105 active:scale-95 transition-all disabled:opacity-50 disabled:scale-100"
+                                    >
+                                        <Send size={16} />
+                                    </button>
+                                </div>
+                                <p className="text-[10px] text-center text-gray-400">
+                                    End-to-end encrypted medical consultation
+                                </p>
+                            </form>
+                        </div>
                     </motion.div>
                 </div>
             </div>

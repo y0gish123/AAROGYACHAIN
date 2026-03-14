@@ -128,8 +128,10 @@ router.post('/doctor/register', async (req, res) => {
 router.post('/doctor/login', async (req, res) => {
     try {
         const { uid, password } = req.body;
+        console.log(`[DoctorLogin] Attempt for UID: ${uid}`);
 
         if (!uid || !password) {
+            console.warn(`[DoctorLogin] Missing credentials`);
             return res.status(400).json({ success: false, message: 'UID and Password are required' });
         }
 
@@ -137,26 +139,32 @@ router.post('/doctor/login', async (req, res) => {
         try {
             if (mongoose.connection.readyState === 1) {
                 doctor = await Doctor.findOne({ uid });
+                console.log(`[DoctorLogin] Database query result: ${doctor ? 'Found' : 'Not Found'}`);
             } else {
                 throw new Error("Database connection is not available");
             }
         } catch (dbError) {
-            console.error("DB Error during doctor login:", dbError.message);
+            console.error("[DoctorLogin] DB Error:", dbError.message);
             return res.status(500).json({ success: false, message: 'Database connection error. Please try again later.' });
         }
 
         if (!doctor) {
+            console.warn(`[DoctorLogin] Doctor with UID ${uid} not found`);
             return res.status(400).json({ success: false, message: 'Invalid UID or Password' });
         }
 
         const isMatch = await bcrypt.compare(password, doctor.password);
+        console.log(`[DoctorLogin] Password match: ${isMatch}`);
+        
         if (!isMatch) {
+            console.warn(`[DoctorLogin] Password mismatch for UID ${uid}`);
             return res.status(400).json({ success: false, message: 'Invalid UID or Password' });
         }
 
+        console.log(`[DoctorLogin] Login successful for: ${doctor.fullName}`);
         res.json({ success: true, message: 'Doctor login successful', doctor: { id: doctor._id, fullName: doctor.fullName, uid: doctor.uid } });
     } catch (error) {
-        console.error(error);
+        console.error("[DoctorLogin] Outer Error:", error);
         res.status(500).json({ success: false, message: 'Server Error' });
     }
 });
