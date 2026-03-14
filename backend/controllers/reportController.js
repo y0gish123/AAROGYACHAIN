@@ -39,43 +39,48 @@ exports.uploadReport = async (req, res) => {
 
         if (!file) return res.status(400).json({ error: 'No report file uploaded' });
 
-        let ipfsUrl = 'https://gateway.pinata.cloud/ipfs/mock_hash';
-        if (process.env.PINATA_API_KEY && process.env.PINATA_SECRET_KEY) {
-            try {
-                ipfsUrl = await uploadToPinata(file.path, file.originalname);
-            } catch (pinataErr) {
-                console.error("Pinata upload failed, using mock:", pinataErr.message);
-            }
-        }
-
-        // PDF Text Extraction & AI Summary Generation
-        let extractedText = "";
-        let aiSummary = `Automated analysis for ${reportType}. Visual inspection completed.`;
-
-        if (file && file.mimetype === 'application/pdf') {
-            try {
-                const dataBuffer = fs.readFileSync(file.path);
-                const pdfData = await pdf(dataBuffer);
-                extractedText = pdfData.text;
-
-                if (extractedText.trim()) {
-                    // Generate AI Summary using Gemini
-                    const summaryPrompt = `
-                    You are a professional medical scribe. Summarize the following medical report text in 2-3 concise sentences. 
-                    Focus on key findings, vitals, or diagnoses. If the text is illegible or not a medical report, return a generic summary.
-                    
-                    Report Content:
-                    ${extractedText.substring(0, 5000)} // Limit context to 5k chars
-                    `;
-
-                    const model = genAI.getGenerativeModel({ model: "gemini-flash-lite-latest" });
-                    const summaryResponse = await model.generateContent(summaryPrompt);
-                    aiSummary = summaryResponse.response.text().trim();
+        // Define parallel tasks
+        const pinataTask = (async () => {
+            if (process.env.PINATA_API_KEY && process.env.PINATA_SECRET_KEY) {
+                try {
+                    return await uploadToPinata(file.path, file.originalname);
+                } catch (pinataErr) {
+                    console.error("Pinata upload failed, using mock:", pinataErr.message);
                 }
-            } catch (err) {
-                console.error("PDF Parsing/Summary error:", err.message);
             }
-        }
+            return 'https://gateway.pinata.cloud/ipfs/mock_hash';
+        })();
+
+        const aiTask = (async () => {
+            let aiSummary = `Automated analysis for ${reportType}. Visual inspection completed.`;
+            if (file && file.mimetype === 'application/pdf') {
+                try {
+                    const dataBuffer = fs.readFileSync(file.path);
+                    const pdfData = await pdf(dataBuffer);
+                    const extractedText = pdfData.text;
+
+                    if (extractedText.trim()) {
+                        const summaryPrompt = `
+                        You are a professional medical scribe. Summarize the following medical report text in 2-3 concise sentences. 
+                        Focus on key findings, vitals, or diagnoses. If the text is illegible or not a medical report, return a generic summary.
+                        
+                        Report Content:
+                        ${extractedText.substring(0, 5000)}
+                        `;
+
+                        const model = genAI.getGenerativeModel({ model: "gemini-flash-lite-latest" });
+                        const summaryResponse = await model.generateContent(summaryPrompt);
+                        aiSummary = summaryResponse.response.text().trim();
+                    }
+                } catch (err) {
+                    console.error("PDF Parsing/Summary error:", err.message);
+                }
+            }
+            return aiSummary;
+        })();
+
+        // Execute tasks in parallel
+        const [ipfsUrl, aiSummary] = await Promise.all([pinataTask, aiTask]);
 
         const newReport = await Report.create({
             abhaNumber,
